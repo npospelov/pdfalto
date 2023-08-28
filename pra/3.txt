@@ -1,0 +1,27 @@
+mkdir -p ~/Fuzzing/pdfalto/src ~/Fuzzing/pdfalto/bin ~/Fuzzing/pdfalto/inout/in ~/Fuzzing/pdfalto/inout/asan ~/Fuzzing/pdfalto/inout/ubsan
+
+docker run -ti --name pdfalto_fuzz -v /home/$USER/Fuzzing/pdfalto:/fuzz aflplusplus/aflplusplus
+
+cd /fuzz/src/
+
+git clone --recurse-submodules https://github.com/npospelov/pdfalto.git
+
+cd pdfalto/
+
+export AFL_USE_ASAN=1
+
+export AFL_USE_UBSAN=1
+
+CC=afl-clang-lto CXX=afl-clang-lto++ CFLAGS="-O0 -g3" CFLAGS="-O0 -g3" cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_SHARED_LIBS=OFF CMakeLists.txt
+
+make -j$(nproc)
+
+apt update && apt install screen -y
+
+export ASAN_OPTIONS=abort_on_error=1:symbolize=0:allocator_may_return_null=1:log_path=/fuzz/inout/asan
+
+export UBSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_stack_trace=1:allocator_may_return_null=1:log_path=/fuzz/inout/ubsan
+
+screen -S "M-pdfalto" -d -m afl-fuzz -i /fuzz/inout/in -o /fuzz/inout/out -M "M" -- ./pdfalto @@
+screen -S "S-1-pdfalto" -d -m afl-fuzz -i /fuzz/inout/in -o /fuzz/inout/out -M "S-1" -- ./pdfalto @@
+screen -S "S-2-pdfalto" -d -m afl-fuzz -i /fuzz/inout/in -o /fuzz/inout/out -M "S-2" -- ./pdfalto @@
